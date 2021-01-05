@@ -43,6 +43,17 @@ impl LoxVm {
         }
     }
 
+    #[inline]
+    fn peek_mut(&mut self, offset: isize) -> &mut Value {
+        // Top cursor points to the element just after the actual top element.
+        let index = -1 + self.top as isize + offset;
+        assert!(index >= 0, "Stack underflow");
+        assert!(index < Self::STACK_MAX as isize, "Stack overflow");
+
+        unsafe { self.stack.get_unchecked_mut(index as usize) }
+    }
+
+    #[inline]
     fn push(&mut self, value: Value) {
         assert!(self.top < Self::STACK_MAX, "Stack overflow");
 
@@ -51,6 +62,7 @@ impl LoxVm {
         self.top += 1;
     }
 
+    #[inline]
     fn pop(&mut self) -> Value {
         assert!(self.top > 0, "Stack underflow");
 
@@ -125,7 +137,8 @@ impl LoxVm {
                     arithmetic_op!(self, a / b);
                 }
                 Some(OpCode::Return) => {
-                    println!("Interpret return {}", self.pop());
+                    // println!("Interpret return {}", self.pop());
+                    self.pop();
                     return Ok(());
                 }
                 _ => {}
