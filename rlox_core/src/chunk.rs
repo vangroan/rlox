@@ -10,6 +10,11 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    /// Threshold where the number of constants changes from using 8-bit indices to 24-bit indices.
+    const CONSTANT_THRESHOLD: usize = 256;
+    /// Exclusive maximum number of allowed constants. Limited by max value of 24-bit unsigned integer.
+    const CONSTANT_MAX: usize = 16_777_216;  // 2^24
+
     pub fn new() -> Self {
         Chunk {
             constants: vec![],
@@ -30,10 +35,16 @@ impl Chunk {
         T: Into<Value>,
     {
         assert!(
-            self.constants.len() + 1 < std::u16::MAX as usize,
+            self.constants.len() + 1 < Chunk::CONSTANT_MAX,
             "Chunk constant vector overflow"
         );
-        let index = ConstantIndex(self.constants.len() as u16);
+
+        // Comparison is exclusive, as 256 rolls over to the 9th bit.
+        let index = if self.constants.len() < Chunk::CONSTANT_THRESHOLD {
+            ConstantIndex::U8(self.constants.len() as u8)
+        } else {
+            ConstantIndex::U24(self.constants.len() as u32)
+        };
         self.constants.push(constant.into());
         index
     }
@@ -105,7 +116,7 @@ impl Chunk {
         match OpCode::from_u8(instruction) {
             Some(opcode) => match opcode {
                 OpCode::Return => Self::disassemble_instruction_1(w, offset, opcode),
-                OpCode::Constant => self.disassemble_constant(w, offset, opcode),
+                OpCode::Constant | OpCode::ConstantLong => self.disassemble_constant(w, offset, opcode),
             },
             None => {
                 eprintln!("Unknown opcode {:x}", instruction);
@@ -128,33 +139,92 @@ impl Chunk {
     where
         W: FmtWrite,
     {
-        let index = ConstantIndex((self.code[offset + 1] as u16) << 8 | self.code[offset + 2] as u16);
-        writeln!(w, "{:?}\t\t{} '{}'", op, index, self.constants[index.0 as usize])?;
-        Ok(offset + 3)
+        let index = match op {
+            OpCode::Constant => ConstantIndex::U8(self.code[offset + 1]),
+            OpCode::ConstantLong => {
+                ConstantIndex::from_u24_parts(self.code[offset + 1], self.code[offset + 2], self.code[offset + 3])
+            }
+            _ => {
+                unreachable!("Disassemble constant called with incorrect opcode {:?}", op);
+            }
+        };
+        writeln!(w, "{:?}\t\t{:4} '{}'", op, index, self.constants[index.to_usize()])?;
+
+        match index {
+            ConstantIndex::U8(_) => Ok(offset + 2),
+            ConstantIndex::U24(_) => Ok(offset + 4),
+        }
     }
 }
 
 /// Unique identifier to a constant value stored in a chunk.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct ConstantIndex(u16);
+pub enum ConstantIndex {
+    /// Index to the first 256 constants.
+    U8(u8),
+    /// Index to the rest of the constants. Only the 24 lower (rightmost) bits are used, because
+    /// the whole 32-bit instruction also contains an 8-bit opcode.
+    U24(u32),
+}
 
 impl ConstantIndex {
+    pub fn from_u8(value: u8) -> Self {
+        ConstantIndex::U8(value)
+    }
+
+    /// Assemble an index from instruction bytes.
+    ///
+    /// The parts must be in big-endian order, with the most significant byte first and least significant last.
+    pub fn from_u24_parts(x: u8, y: u8, z: u8) -> Self {
+        ConstantIndex::U24((x as u32) << 16 | (y as u32) << 8 | z as u32)
+    }
+
     #[inline]
-    pub fn val(&self) -> u16 {
-        self.0
+    pub fn val(&self) -> u32 {
+        match self {
+            ConstantIndex::U8(value) => *value as u32,
+            ConstantIndex::U24(value) => *value,
+        }
+    }
+
+    #[inline]
+    pub fn to_usize(&self) -> usize {
+        self.val() as usize
+    }
+
+    #[inline]
+    pub fn is_u8(&self) -> bool {
+        matches!(self, ConstantIndex::U8(_))
+    }
+
+    #[inline]
+    pub fn is_u24(&self) -> bool {
+        matches!(self, ConstantIndex::U24(_))
     }
 }
 
 impl std::fmt::Display for ConstantIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.0.fmt(f)
+        match self {
+            ConstantIndex::U8(value) => value.fmt(f),
+            ConstantIndex::U24(value) => value.fmt(f),
+        }
     }
 }
 
 impl PushCode for ConstantIndex {
     fn push_instruction(&self, chunk: &mut Chunk, line: usize) {
-        chunk.push_u8((self.0 & 0xF0 >> 8) as u8, line);
-        chunk.push_u8((self.0 & 0xF) as u8, line);
+        match self {
+            ConstantIndex::U8(value) => {
+                chunk.push_u8(*value, line);
+            }
+            ConstantIndex::U24(value) => {
+                // Big-endian
+                chunk.push_u8(((*value >> 16) & 0xFF) as u8, line);
+                chunk.push_u8(((*value >> 8) & 0xFF) as u8, line);
+                chunk.push_u8((*value & 0xFF) as u8, line);
+            }
+        }
     }
 }
 
@@ -166,5 +236,34 @@ pub trait PushCode {
 impl PushCode for OpCode {
     fn push_instruction(&self, chunk: &mut Chunk, line: usize) {
         chunk.push_op(*self, line);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_constant_index() {
+        let mut chunk = Chunk::new();
+
+        for i in 0..1024 {
+            let index = chunk.add_constant(i as f64);
+
+            if i < Chunk::CONSTANT_THRESHOLD {
+                chunk.push(OpCode::Constant, 123);
+                chunk.push(index, 123);
+
+                assert!(index.is_u8());
+                assert_eq!(index, ConstantIndex::from_u8(i as u8));
+            } else {
+                chunk.push(OpCode::ConstantLong, 123);
+                chunk.push(index, 123);
+
+                assert!(index.is_u24());
+            }
+        }
+
+        // println!("{}", chunk.disassemble_to_string().unwrap());
     }
 }
