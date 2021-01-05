@@ -33,7 +33,7 @@ impl Neg for Value {
     fn neg(self) -> Self {
         match self {
             Value::Float(v) => Value::Float(-v),
-            value @ _ => Value::Err,
+            _ => Value::Err,
         }
     }
 }
@@ -43,7 +43,7 @@ impl Add for Value {
     fn add(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Float(a), Value::Float(b)) => Value::Float(a + b),
-            pair @ _ => Value::Err,
+            _ => Value::Err,
         }
     }
 }
@@ -53,7 +53,7 @@ impl Sub for Value {
     fn sub(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
-            pair @ _ => Value::Err,
+            _ => Value::Err,
         }
     }
 }
@@ -63,7 +63,7 @@ impl Mul for Value {
     fn mul(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
-            pair @ _ => Value::Err,
+            _ => Value::Err,
         }
     }
 }
@@ -73,7 +73,7 @@ impl Div for Value {
     fn div(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
-            pair @ _ => Value::Err,
+            _ => Value::Err,
         }
     }
 }

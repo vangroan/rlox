@@ -43,6 +43,7 @@ impl LoxVm {
         }
     }
 
+    #[allow(dead_code)]
     #[inline]
     fn peek_mut(&mut self, offset: isize) -> &mut Value {
         // Top cursor points to the element just after the actual top element.

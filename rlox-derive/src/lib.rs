@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
-    Expr, ExprLit, ExprRepeat, Ident, Lit, Path, Token, Type,
+    Expr, ExprRepeat, Path, Token,
 };
 
 /// Utility for instantiating arrays of repeating elements that do not implement `Copy`.
@@ -63,6 +63,7 @@ struct ArrayConstruct {
     /// Length of array.
     n: Box<Expr>,
     /// Array instantiate expression. `[el; n]`
+    #[allow(dead_code)]
     arr: Box<ExprRepeat>,
 }
 

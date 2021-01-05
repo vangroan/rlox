@@ -1,5 +1,4 @@
 //! Errors
-use crate::value::Value;
 use std::{error::Error, fmt};
 
 #[derive(Debug)]
