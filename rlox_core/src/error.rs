@@ -1,4 +1,5 @@
 //! Errors
+use crate::value::Value;
 use std::{error::Error, fmt};
 
 #[derive(Debug)]
@@ -7,6 +8,7 @@ pub enum LoxError {
     Compile,
     /// Error during script execution.
     Runtime,
+    TypeError,
 }
 
 impl Error for LoxError {}
@@ -16,6 +18,7 @@ impl fmt::Display for LoxError {
         match self {
             LoxError::Compile => write!(f, "compilation error"),
             LoxError::Runtime => write!(f, "runtime error"),
+            LoxError::TypeError => write!(f, "type error"),
         }
     }
 }

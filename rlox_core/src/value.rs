@@ -1,11 +1,15 @@
 //! Dynamically typed value.
-use std::fmt;
-use std::fmt::Debug;
+use std::{
+    fmt,
+    fmt::Debug,
+    ops::{Add, Div, Mul, Neg, Sub},
+};
 
 #[derive(Debug, Clone)]
 pub enum Value {
     Null,
     Float(f64),
+    Err,
 }
 
 impl Into<Value> for f64 {
@@ -19,6 +23,57 @@ impl fmt::Display for Value {
         match self {
             Value::Null => write!(f, "null"),
             Value::Float(value) => fmt::Display::fmt(value, f),
+            Value::Err => write!(f, "error"),
+        }
+    }
+}
+
+impl Neg for Value {
+    type Output = Self;
+    fn neg(self) -> Self {
+        match self {
+            Value::Float(v) => Value::Float(-v),
+            value @ _ => Value::Err,
+        }
+    }
+}
+
+impl Add for Value {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Float(a), Value::Float(b)) => Value::Float(a + b),
+            pair @ _ => Value::Err,
+        }
+    }
+}
+
+impl Sub for Value {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
+            pair @ _ => Value::Err,
+        }
+    }
+}
+
+impl Mul for Value {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
+            pair @ _ => Value::Err,
+        }
+    }
+}
+
+impl Div for Value {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
+            pair @ _ => Value::Err,
         }
     }
 }

@@ -11,6 +11,18 @@ use rlox_derive::array;
 #[cfg(feature = "trace-execution")]
 use std::fmt::Write as FmtWrite;
 
+/// Helper for handling type checking on expressions that result in a `Value` containing a numerical type.
+#[doc(hidden)]
+macro_rules! arithmetic_op {
+    ($vm:ident, $op:expr) => {
+        match $op {
+            value @ Value::Float(_) => $vm.push(value),
+            Value::Err => return Err(LoxError::TypeError),
+            _ => unreachable!("Operator not implemented"),
+        }
+    };
+}
+
 pub struct LoxVm {
     chunk: Chunk,
     ip: usize,
@@ -32,7 +44,7 @@ impl LoxVm {
     }
 
     fn push(&mut self, value: Value) {
-        assert!(self.top >= Self::STACK_MAX, "Stack overflow");
+        assert!(self.top < Self::STACK_MAX, "Stack overflow");
 
         // Top index points to just past the top element.
         self.stack[self.top] = value;
@@ -40,10 +52,9 @@ impl LoxVm {
     }
 
     fn pop(&mut self) -> Value {
-        self.top -= 1;
-
         assert!(self.top > 0, "Stack underflow");
 
+        self.top -= 1;
         let mut value = Value::Null;
         std::mem::swap(&mut value, &mut self.stack[self.top]);
         value
@@ -86,11 +97,35 @@ impl LoxVm {
             match op {
                 Some(OpCode::Constant) => {
                     let index = ConstantIndex::from_u8(self.get_byte());
-                    let constant = self.chunk.get_constant_unchecked(index);
-                    self.push(constant.clone());
+                    let constant = self.chunk.get_constant_unchecked(index).clone();
+                    self.push(constant);
+                }
+                Some(OpCode::Negate) => {
+                    let value = self.pop();
+                    arithmetic_op!(self, -value);
+                }
+                Some(OpCode::Add) => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    arithmetic_op!(self, a + b);
+                }
+                Some(OpCode::Subtract) => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    arithmetic_op!(self, a - b);
+                }
+                Some(OpCode::Multiply) => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    arithmetic_op!(self, a * b);
+                }
+                Some(OpCode::Divide) => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    arithmetic_op!(self, a / b);
                 }
                 Some(OpCode::Return) => {
-                    println!("Return {}", self.pop());
+                    println!("Interpret return {}", self.pop());
                     return Ok(());
                 }
                 _ => {}

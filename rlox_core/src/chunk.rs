@@ -140,6 +140,11 @@ impl Chunk {
                 OpCode::NoOp => Self::disassemble_instruction_1(w, offset, opcode),
                 OpCode::Return => Self::disassemble_instruction_1(w, offset, opcode),
                 OpCode::Constant | OpCode::ConstantLong => self.disassemble_constant(w, offset, opcode),
+                OpCode::Negate => Self::disassemble_instruction_1(w, offset, opcode),
+                OpCode::Add => Self::disassemble_instruction_1(w, offset, opcode),
+                OpCode::Subtract => Self::disassemble_instruction_1(w, offset, opcode),
+                OpCode::Multiply => Self::disassemble_instruction_1(w, offset, opcode),
+                OpCode::Divide => Self::disassemble_instruction_1(w, offset, opcode),
             },
             None => {
                 eprintln!("Unknown opcode {:x}", instruction);

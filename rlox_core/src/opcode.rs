@@ -19,4 +19,11 @@ pub enum OpCode {
     /// Followed by 3 instructions (24-bits) containing an index to the constant.
     /// This is a large 32-bit operation, allowing for 2²⁴ constants.
     ConstantLong,
+    /// *Arithmetic* Unary negation. Example `-2.1`.
+    /// Replaces stack top with a negated value.
+    Negate,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
