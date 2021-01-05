@@ -1,4 +1,4 @@
-use rlox_core::{Chunk, OpCode};
+use rlox_core::{Chunk, LoxVm, OpCode};
 
 fn main() {
     let mut chunk = Chunk::new();
@@ -10,4 +10,7 @@ fn main() {
     chunk.push(OpCode::Return, 123);
 
     println!("{}", chunk.disassemble_to_string().unwrap());
+
+    let mut vm = LoxVm::new();
+    vm.interpret(chunk).unwrap();
 }

@@ -3,6 +3,11 @@ use num_derive::{FromPrimitive, ToPrimitive};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToPrimitive, FromPrimitive)]
 pub enum OpCode {
+    /// Only used by the VM to advance the instruction pointer.
+    ///
+    /// In the future this will be used to convert u8 to `OpCode` without having to unwrap from `Option`. Unwrapping
+    /// introduces additional overhead in the VM loop.
+    NoOp = 0,
     /// Return from a function.
     Return = 1,
     /// Load a constant value from a chunk.

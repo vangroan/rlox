@@ -13,14 +13,30 @@ impl Chunk {
     /// Threshold where the number of constants changes from using 8-bit indices to 24-bit indices.
     const CONSTANT_THRESHOLD: usize = 256;
     /// Exclusive maximum number of allowed constants. Limited by max value of 24-bit unsigned integer.
-    const CONSTANT_MAX: usize = 16_777_216;  // 2^24
+    const CONSTANT_MAX: usize = 16_777_216; // 2^24
 
     pub fn new() -> Self {
         Chunk {
-            constants: vec![],
+            constants: Vec::with_capacity(Self::CONSTANT_THRESHOLD),
             code: vec![],
             line: vec![],
         }
+    }
+
+    /// Retrieve a byte instruction from the chunk code.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the given offset is out of bounds.
+    #[inline(always)]
+    pub fn get_byte(&self, offset: usize) -> u8 {
+        self.code[offset]
+    }
+
+    /// Returns the number of instructions in the chunk code.
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.code.len()
     }
 
     /// Adds a constant value to the chunk's constant registry.
@@ -47,6 +63,11 @@ impl Chunk {
         };
         self.constants.push(constant.into());
         index
+    }
+
+    #[inline]
+    pub fn get_constant_unchecked(&self, index: ConstantIndex) -> &Value {
+        unsafe { self.constants.get_unchecked(index.to_usize()) }
     }
 
     /// Write a single opcode to the chunk's code.
@@ -96,7 +117,8 @@ impl Chunk {
     }
 
     #[inline]
-    fn disassemble_instruction<W>(&self, w: &mut W, offset: usize) -> Result<usize, std::fmt::Error>
+    #[doc(hidden)]
+    pub fn disassemble_instruction<W>(&self, w: &mut W, offset: usize) -> Result<usize, std::fmt::Error>
     where
         W: FmtWrite,
     {
@@ -115,6 +137,7 @@ impl Chunk {
 
         match OpCode::from_u8(instruction) {
             Some(opcode) => match opcode {
+                OpCode::NoOp => Self::disassemble_instruction_1(w, offset, opcode),
                 OpCode::Return => Self::disassemble_instruction_1(w, offset, opcode),
                 OpCode::Constant | OpCode::ConstantLong => self.disassemble_constant(w, offset, opcode),
             },
@@ -168,6 +191,7 @@ pub enum ConstantIndex {
 }
 
 impl ConstantIndex {
+    #[inline(always)]
     pub fn from_u8(value: u8) -> Self {
         ConstantIndex::U8(value)
     }
@@ -175,6 +199,7 @@ impl ConstantIndex {
     /// Assemble an index from instruction bytes.
     ///
     /// The parts must be in big-endian order, with the most significant byte first and least significant last.
+    #[inline]
     pub fn from_u24_parts(x: u8, y: u8, z: u8) -> Self {
         ConstantIndex::U24((x as u32) << 16 | (y as u32) << 8 | z as u32)
     }
