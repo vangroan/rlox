@@ -1,6 +1,8 @@
+use flame;
 use rlox_core::{Chunk, LoxVm, OpCode};
+use std::fs::File;
 
-fn main() {
+fn run() {
     let mut chunk = Chunk::new();
 
     let index = chunk.add_constant(1.2);
@@ -27,4 +29,12 @@ fn main() {
 
     let mut vm = LoxVm::new();
     vm.interpret(chunk).unwrap();
+}
+
+fn main() {
+    for _ in 0..1 {
+        run();
+    }
+
+    flame::dump_html(&mut File::create("flame-graphs/scratch.html").unwrap()).unwrap();
 }

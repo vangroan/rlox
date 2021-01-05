@@ -55,6 +55,9 @@ impl LoxVm {
 
     #[inline]
     fn push(&mut self, value: Value) {
+        #[cfg(feature = "profile")]
+        let _ = flame::start_guard("vm push");
+
         assert!(self.top < Self::STACK_MAX, "Stack overflow");
 
         // Top index points to just past the top element.
@@ -64,6 +67,9 @@ impl LoxVm {
 
     #[inline]
     fn pop(&mut self) -> Value {
+        #[cfg(feature = "profile")]
+        let _ = flame::start_guard("vm pop");
+
         assert!(self.top > 0, "Stack underflow");
 
         self.top -= 1;
@@ -91,10 +97,16 @@ impl LoxVm {
     }
 
     fn run(&mut self) -> error::Result<()> {
+        #[cfg(feature = "profile")]
+        let _ = flame::start_guard("vm run");
+
         #[cfg(feature = "trace-execution")]
         let mut buf = String::new();
 
         loop {
+            #[cfg(feature = "profile")]
+            let _ = flame::start_guard("vm loop");
+
             #[cfg(feature = "trace-execution")]
             {
                 println!("{:?}", &self.stack[0..self.top]);
@@ -105,37 +117,61 @@ impl LoxVm {
 
             let op = OpCode::from_u8(self.get_byte());
 
+            #[cfg(feature = "profile")]
+            let _ = flame::start_guard("vm opcode dispatch");
+
             match op {
                 Some(OpCode::Constant) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode Constant");
+
                     let index = ConstantIndex::from_u8(self.get_byte());
                     let constant = self.chunk.get_constant_unchecked(index).clone();
                     self.push(constant);
                 }
                 Some(OpCode::Negate) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode Negate");
+
                     let value = self.pop();
                     arithmetic_op!(self, -value);
                 }
                 Some(OpCode::Add) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode Add");
+
                     let b = self.pop();
                     let a = self.pop();
                     arithmetic_op!(self, a + b);
                 }
                 Some(OpCode::Subtract) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode Subtract");
+
                     let b = self.pop();
                     let a = self.pop();
                     arithmetic_op!(self, a - b);
                 }
                 Some(OpCode::Multiply) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode Multiply");
+
                     let b = self.pop();
                     let a = self.pop();
                     arithmetic_op!(self, a * b);
                 }
                 Some(OpCode::Divide) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode Divide");
+
                     let b = self.pop();
                     let a = self.pop();
                     arithmetic_op!(self, a / b);
                 }
                 Some(OpCode::Return) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode Return");
+
                     // println!("Interpret return {}", self.pop());
                     self.pop();
                     return Ok(());
