@@ -96,13 +96,12 @@ impl LoxVm {
 
         loop {
             #[cfg(feature = "trace-execution")]
-            println!("{:?}", &self.stack[0..self.top]);
-            #[cfg(feature = "trace-execution")]
-            self.chunk.disassemble_instruction(&mut buf, self.ip).unwrap();
-            #[cfg(feature = "trace-execution")]
-            print!("{}", buf);
-            #[cfg(feature = "trace-execution")]
-            buf.clear();
+            {
+                println!("{:?}", &self.stack[0..self.top]);
+                self.chunk.disassemble_instruction(&mut buf, self.ip).unwrap();
+                print!("{}", buf);
+                buf.clear();
+            }
 
             let op = OpCode::from_u8(self.get_byte());
 
