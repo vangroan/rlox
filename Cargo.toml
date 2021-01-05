@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "rlox_core",
+    "rlox-derive"
+]
