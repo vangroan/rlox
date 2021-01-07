@@ -7,7 +7,7 @@ use crate::{
     value::Value,
 };
 use num_traits::FromPrimitive;
-use rlox_derive::array;
+use rlox_derive::array_init;
 #[cfg(feature = "trace-execution")]
 use std::fmt::Write as FmtWrite;
 
@@ -39,7 +39,7 @@ impl LoxVm {
             chunk: Chunk::new(),
             ip: 0,
             top: 0,
-            stack: array!(Value, [Value::Null; LoxVm::STACK_MAX]),
+            stack: array_init!(Value, [Value::Null; LoxVm::STACK_MAX]),
         }
     }
 
