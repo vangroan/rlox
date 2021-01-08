@@ -160,6 +160,7 @@ mod test {
 
     #[test]
     fn test_gcbox_size() {
+        println!("size of Gc<()> {}", ::std::mem::size_of::<Gc<()>>());
         println!("size of GcBox<()> {}", ::std::mem::size_of::<GcBox<()>>());
         println!("size of Foo {}", ::std::mem::size_of::<Foo>());
     }
