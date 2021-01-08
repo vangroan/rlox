@@ -9,4 +9,7 @@ mod scan_impl;
 pub use collect::Collector;
 pub use gc::Gc;
 
-// TODO: Derive Codegen
+#[cfg(feature = "derive")]
+pub mod derive {
+    pub use rlox_gc_derive::Scan;
+}

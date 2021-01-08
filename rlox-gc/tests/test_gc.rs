@@ -1,30 +1,31 @@
 use rlox_gc::{context::Context, scan::Scan, Collector, Gc};
+use rlox_gc_derive::Scan;
 use std::cell::Cell;
 
-#[derive(Debug)]
+#[derive(Debug, Scan)]
 struct Foo {
     value: u32,
     other: Gc<Bar>,
     items: Vec<Bar>,
 }
 
-unsafe impl Scan for Foo {
-    fn scan(&self, ctx: &mut Context) {
-        println!("Scan Foo");
-        self.other.scan(ctx);
-        self.items.scan(ctx);
-    }
-
-    fn root(&self) {
-        self.other.root();
-        self.items.root();
-    }
-
-    fn unroot(&self) {
-        self.other.unroot();
-        self.items.unroot();
-    }
-}
+// unsafe impl Scan for Foo {
+//     fn scan(&self, ctx: &mut Context) {
+//         println!("Scan Foo");
+//         self.other.scan(ctx);
+//         self.items.scan(ctx);
+//     }
+//
+//     fn root(&self) {
+//         self.other.root();
+//         self.items.root();
+//     }
+//
+//     fn unroot(&self) {
+//         self.other.unroot();
+//         self.items.unroot();
+//     }
+// }
 
 #[derive(Debug)]
 struct Bar {

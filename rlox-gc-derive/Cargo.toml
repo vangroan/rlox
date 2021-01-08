@@ -1,14 +1,15 @@
 [package]
-name = "rlox-gc"
+name = "rlox-gc-derive"
 version = "0.1.0"
 authors = ["Willem Victor <wimpievictor@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-typed-arena = "2.0.1"
-rlox-gc-derive = { version = "*", path = "../rlox-gc-derive" }
+[lib]
+proc-macro = true
 
-[features]
-derive = []
+[dependencies]
+syn = { version = "1.0", features = ["derive"] }
+quote = "1.0"
+proc-macro2 = { version = "1.0", default-features = false }

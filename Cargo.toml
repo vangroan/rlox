@@ -3,4 +3,5 @@ members = [
     "rlox-core",
     "rlox-derive",
     "rlox-gc",
+    "rlox-gc-derive",
 ]
