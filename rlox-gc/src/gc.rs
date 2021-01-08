@@ -1,5 +1,5 @@
 //! `Gc<T>` smart pointer.
-use crate::scan::Scan;
+use crate::{context::Context, scan::Scan, Collector};
 use std::borrow::BorrowMut;
 use std::{
     cell::Cell,
@@ -13,7 +13,7 @@ pub struct Gc<T: Scan + ?Sized> {
 }
 
 impl<T: Scan + ?Sized> Gc<T> {
-    fn from_inner(ptr: NonNull<GcBox<T>>) -> Self {
+    pub(crate) fn from_inner(ptr: NonNull<GcBox<T>>) -> Self {
         Gc { ptr }
     }
 
@@ -37,18 +37,7 @@ impl<T: Scan + ?Sized> Gc<T> {
     }
 }
 
-impl<T: Scan + Sized> Gc<T> {
-    /// FIXME: !!!!! Box is leaked but not dropped. In future a `Gc` must strictly only be created by an Arena.
-    pub fn new(value: T) -> Self {
-        Gc::from_inner(unsafe {
-            NonNull::new_unchecked(Box::leak(Box::new(GcBox {
-                root: Cell::new(1),
-                color: Cell::new(GcColor::White),
-                value,
-            })))
-        })
-    }
-}
+impl<T: Scan + Sized> Gc<T> {}
 
 impl<T: Debug + Scan + ?Sized> Debug for Gc<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -73,17 +62,17 @@ impl<T: Scan + ?Sized> Deref for Gc<T> {
     }
 }
 
-impl<T: Scan + ?Sized> Scan for Gc<T> {
-    fn scan(&self) {
-        self.inner().scan();
+impl<T: 'static + Scan> Scan for Gc<T> {
+    fn scan(&self, ctx: &mut Context) {
+        Collector::scan_ptr(ctx, self.ptr);
     }
 
     unsafe fn root(&self) {
-        self.inner().root();
+        todo!()
     }
 
     unsafe fn unroot(&self) {
-        self.inner().unroot();
+        todo!()
     }
 }
 
@@ -92,9 +81,11 @@ impl<T: Scan + ?Sized> Scan for Gc<T> {
 /// The `flag` field is information pertinent to the garbage collection algorithm, packed into
 /// a 32-bit fields to reduce the overall size overhead of the struct.
 #[derive(Debug)]
-pub(crate) struct GcBox<T: Scan + ?Sized> {
+#[doc(hidden)]
+pub struct GcBox<T: Scan + ?Sized> {
     pub(crate) root: Cell<u32>,
     pub(crate) color: Cell<GcColor>,
+    pub(crate) next: Cell<Option<NonNull<GcBox<dyn Scan>>>>,
     pub(crate) value: T,
 }
 
@@ -113,23 +104,6 @@ impl<T: Scan + ?Sized> GcBox<T> {
 
     fn color(&self) -> GcColor {
         self.color.get()
-    }
-}
-
-impl<T: Scan + ?Sized> Scan for GcBox<T> {
-    fn scan(&self) {
-        // TODO: Set color
-        self.value.scan();
-    }
-
-    unsafe fn root(&self) {
-        self.incr();
-        self.value.root();
-    }
-
-    unsafe fn unroot(&self) {
-        self.dec();
-        self.value.unroot();
     }
 }
 
@@ -162,7 +136,7 @@ mod test {
     use super::*;
 
     impl Scan for () {
-        fn scan(&self) {}
+        fn scan(&self, _: &mut Context) {}
 
         unsafe fn root(&self) {}
 
@@ -186,6 +160,7 @@ mod test {
             let gcbox = GcBox {
                 root: Cell::new(1),
                 color: Cell::new(*color),
+                next: Cell::new(None),
                 value: (),
             };
 

@@ -1,7 +1,8 @@
 //! Trait for a value that can live in the garbage collector.
+use crate::context::Context;
 
 pub trait Scan {
-    fn scan(&self);
+    fn scan(&self, ctx: &mut Context<'_>);
 
     /// Mark all the `Gc<T>` pointers contained in this value as root.
     ///
