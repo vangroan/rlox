@@ -1,6 +1,5 @@
 //! `Gc<T>` smart pointer.
 use crate::{context::Context, scan::Scan, Collector};
-use std::borrow::BorrowMut;
 use std::{
     cell::Cell,
     fmt::{self, Debug},
@@ -34,10 +33,6 @@ impl<T: Scan + ?Sized> Gc<T> {
     /// by the mark-and-sweep algorithm.
     pub fn inner_size(gc: &Gc<T>) -> usize {
         ::std::mem::size_of_val(gc.inner())
-    }
-
-    pub(crate) unsafe fn as_ptr(&self) -> NonNull<GcBox<T>> {
-        self.ptr
     }
 }
 
@@ -78,16 +73,16 @@ impl<T: Scan + ?Sized> Clone for Gc<T> {
     }
 }
 
-impl<T: 'static + Scan> Scan for Gc<T> {
+unsafe impl<T: 'static + Scan> Scan for Gc<T> {
     fn scan(&self, ctx: &mut Context) {
         Collector::scan_ptr(ctx, self.ptr);
     }
 
-    unsafe fn root(&self) {
+    fn root(&self) {
         todo!("Re-root the Gc when it leaves a `GcCell`")
     }
 
-    unsafe fn unroot(&self) {
+    fn unroot(&self) {
         Collector::unroot_ptr(self.ptr);
     }
 }
@@ -127,10 +122,6 @@ impl<T: Scan + ?Sized> GcBox<T> {
     pub(crate) fn is_root(&self) -> bool {
         self.root.get() > 0
     }
-
-    fn color(&self) -> GcColor {
-        self.color.get()
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,14 +152,7 @@ impl From<u8> for GcColor {
 mod test {
     use super::*;
 
-    impl Scan for () {
-        fn scan(&self, _: &mut Context) {}
-
-        unsafe fn root(&self) {}
-
-        unsafe fn unroot(&self) {}
-    }
-
+    #[allow(dead_code)]
     struct Foo {
         a: u32,
         b: u8,
@@ -190,7 +174,7 @@ mod test {
                 value: (),
             };
 
-            assert_eq!(gcbox.color(), *color);
+            assert_eq!(gcbox.color.get(), *color);
         }
     }
 }

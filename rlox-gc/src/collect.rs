@@ -3,7 +3,7 @@ use crate::{
     gc::{Gc, GcBox, GcColor},
     scan::Scan,
 };
-use std::{cell::Cell, collections::LinkedList, ptr::NonNull};
+use std::{cell::Cell, ptr::NonNull};
 
 pub struct Collector {
     // TODO: Packed arena
@@ -47,7 +47,7 @@ impl Collector {
         //
         // It won't be de-allocated if `Scan` is properly implemented on the value,
         // as it will be reachable from the new root.
-        unsafe { value.unroot() };
+        value.unroot();
 
         let sized = GcBox {
             // Because we return a `Gc<T>` that we lose track
@@ -175,7 +175,7 @@ impl Collector {
                                         // If the previously swept pointer is `Some` then
                                         // we are in the middle of the linked list, and the current
                                         // node needs to be delinked.
-                                        let mut gc_box_prev = unsafe { sweep_prev.as_ref() };
+                                        let gc_box_prev = unsafe { sweep_prev.as_ref() };
                                         gc_box_prev.next.set(next_ptr);
                                     }
                                     None => {
@@ -240,6 +240,22 @@ impl Collector {
     pub(crate) fn unroot_ptr(ptr: NonNull<GcBox<dyn Scan>>) {
         let gc_box = unsafe { ptr.as_ref() };
         gc_box.dec();
+    }
+
+    fn can_drop(&self) -> bool {
+        // TODO: Panic if there are still roots
+        true
+    }
+}
+
+impl Drop for Collector {
+    fn drop(&mut self) {
+        if self.can_drop() {
+            println!("Collector Drop");
+            // Deallocate owned pointers.
+            self.collect();
+            assert_eq!(self.len(), 0, "Collector dropped but some items are still reachable");
+        }
     }
 }
 

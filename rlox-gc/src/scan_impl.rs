@@ -1,29 +1,41 @@
 //! Scan implementations for `std` types.
+use crate::{context::Context, scan::Scan};
 
-use crate::context::Context;
-use crate::scan::Scan;
+macro_rules! static_scan {
+    ($v:ty) => {
+        unsafe impl Scan for $v {
+            fn scan(&self, _: &mut Context) {}
 
-impl<T: Scan> Scan for Option<T> {
+            fn root(&self) {}
+
+            fn unroot(&self) {}
+        }
+    };
+}
+
+static_scan!(());
+
+unsafe impl<T: Scan> Scan for Option<T> {
     fn scan(&self, ctx: &mut Context<'_>) {
         if let Some(val) = self {
             val.scan(ctx);
         }
     }
 
-    unsafe fn root(&self) {
+    fn root(&self) {
         if let Some(val) = self {
             val.root();
         }
     }
 
-    unsafe fn unroot(&self) {
+    fn unroot(&self) {
         if let Some(val) = self {
             val.unroot();
         }
     }
 }
 
-impl<T: Scan> Scan for Vec<T> {
+unsafe impl<T: Scan> Scan for Vec<T> {
     fn scan(&self, ctx: &mut Context<'_>) {
         println!("Scan Vec<T>");
         for item in self {
@@ -32,11 +44,11 @@ impl<T: Scan> Scan for Vec<T> {
         }
     }
 
-    unsafe fn root(&self) {
+    fn root(&self) {
         todo!()
     }
 
-    unsafe fn unroot(&self) {
+    fn unroot(&self) {
         for item in self {
             item.unroot();
         }

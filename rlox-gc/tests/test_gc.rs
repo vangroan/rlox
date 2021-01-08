@@ -8,18 +8,19 @@ struct Foo {
     items: Vec<Bar>,
 }
 
-impl Scan for Foo {
+unsafe impl Scan for Foo {
     fn scan(&self, ctx: &mut Context) {
         println!("Scan Foo");
         self.other.scan(ctx);
         self.items.scan(ctx);
     }
 
-    unsafe fn root(&self) {
-        todo!()
+    fn root(&self) {
+        self.other.root();
+        self.items.root();
     }
 
-    unsafe fn unroot(&self) {
+    fn unroot(&self) {
         self.other.unroot();
         self.items.unroot();
     }
@@ -31,18 +32,18 @@ struct Bar {
     other: Option<Gc<Foo>>,
 }
 
-impl Scan for Bar {
+unsafe impl Scan for Bar {
     fn scan(&self, ctx: &mut Context) {
         println!("Scan Bar");
         self.value.set(self.value.get() + 1);
         self.other.scan(ctx);
     }
 
-    unsafe fn root(&self) {
-        todo!()
+    fn root(&self) {
+        self.other.root();
     }
 
-    unsafe fn unroot(&self) {
+    fn unroot(&self) {
         self.other.unroot();
     }
 }
@@ -115,4 +116,5 @@ fn test_gc_rooting() {
     assert_eq!(gc.len(), 2);
 
     // println!("{:?}", foo_3);
+    drop(foo_3);
 }
