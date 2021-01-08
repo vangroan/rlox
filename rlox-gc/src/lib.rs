@@ -1,4 +1,5 @@
 mod arena;
+mod cell;
 mod collect;
 pub mod context;
 mod gc;

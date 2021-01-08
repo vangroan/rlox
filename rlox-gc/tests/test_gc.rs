@@ -10,7 +10,9 @@ struct Foo {
 
 impl Scan for Foo {
     fn scan(&self, ctx: &mut Context) {
+        println!("Scan Foo");
         self.other.scan(ctx);
+        self.items.scan(ctx);
     }
 
     unsafe fn root(&self) {
@@ -18,7 +20,8 @@ impl Scan for Foo {
     }
 
     unsafe fn unroot(&self) {
-        todo!()
+        self.other.unroot();
+        self.items.unroot();
     }
 }
 
@@ -30,8 +33,9 @@ struct Bar {
 
 impl Scan for Bar {
     fn scan(&self, ctx: &mut Context) {
+        println!("Scan Bar");
         self.value.set(self.value.get() + 1);
-        // TODO: Walk deeper. Fix cycles first.
+        self.other.scan(ctx);
     }
 
     unsafe fn root(&self) {
@@ -39,7 +43,7 @@ impl Scan for Bar {
     }
 
     unsafe fn unroot(&self) {
-        todo!()
+        self.other.unroot();
     }
 }
 
@@ -49,37 +53,66 @@ fn test_gc_rooting() {
     let mut gc = Collector::new();
 
     let bar = Bar {
-        value: Cell::new(1),
+        value: Cell::new(1000),
         other: None,
     };
+    let bar_gc = gc.alloc(bar);
     let foo_2 = Foo {
-        value: 3,
-        other: gc.alloc(Bar {
-            value: Cell::new(4),
-            other: None,
-        }),
+        value: 20000,
+        other: bar_gc.clone(),
         items: vec![],
     };
     let foo = Foo {
-        value: 2,
-        other: gc.alloc(bar),
+        value: 10000,
+        other: bar_gc.clone(),
         items: vec![
             Bar {
-                value: Cell::new(2),
+                value: Cell::new(2000),
                 other: None,
             },
             Bar {
-                value: Cell::new(3),
+                value: Cell::new(3000),
                 other: Some(gc.alloc(foo_2)),
             },
         ],
     };
+    drop(bar_gc); // Decrement reference count
+    println!("Gc len {}", gc.len()); //> 2
 
-    assert!(Gc::is_root(&foo.other), "GC pointer outside of arena must be a root.");
-    println!("size of Gc on stack {}", std::mem::size_of::<Gc<Foo>>());
-    println!("{:#?}", foo);
+    // By moving the foo into a `Gc<T>`, it becomes a root, and its contents are no longer considered roots.
+    println!("Alloc foo");
+    let foo_gc = gc.alloc(foo);
+    println!("Gc len {}", gc.len()); //> 3
+
+    assert!(Gc::is_root(&foo_gc), "GC pointer outside of arena must be a root.");
+    // println!("size of Gc on stack {}", std::mem::size_of::<Gc<Foo>>());
+    println!("{:#?}", foo_gc);
 
     gc.collect();
+    println!("Gc len {}", gc.len()); //> 3
 
-    println!("{:#?}", foo);
+    println!("{:#?}", foo_gc);
+
+    let foo_3 = {
+        let bar = gc.alloc(Bar {
+            value: Cell::new(4000),
+            other: None,
+        });
+        gc.alloc(Foo {
+            value: 30000,
+            other: bar,
+            items: vec![],
+        })
+    };
+
+    // Foo is no longer reachable.
+    drop(foo_gc);
+    println!("Gc len {}", gc.len()); //> 3
+    assert_eq!(gc.len(), 5);
+
+    gc.collect();
+    println!("Gc len {}", gc.len()); //> 0
+    assert_eq!(gc.len(), 2);
+
+    // println!("{:?}", foo_3);
 }

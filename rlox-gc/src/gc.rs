@@ -35,6 +35,10 @@ impl<T: Scan + ?Sized> Gc<T> {
     pub fn inner_size(gc: &Gc<T>) -> usize {
         ::std::mem::size_of_val(gc.inner())
     }
+
+    pub(crate) unsafe fn as_ptr(&self) -> NonNull<GcBox<T>> {
+        self.ptr
+    }
 }
 
 impl<T: Scan + Sized> Gc<T> {}
@@ -62,17 +66,29 @@ impl<T: Scan + ?Sized> Deref for Gc<T> {
     }
 }
 
+impl<T: Scan + ?Sized> Clone for Gc<T> {
+    fn clone(&self) -> Self {
+        // Important: We must increment the reference count of the backing box.
+        unsafe { self.ptr.as_ref().incr() };
+
+        // SAFETY: We're going to share the same pointer between multiple `Gc<T>` now.
+        //         It's reference counted, so we trust the shared value will be garbage collected
+        //         when the count reaches 0 AND it's no longer reachable.
+        Gc::from_inner(self.ptr)
+    }
+}
+
 impl<T: 'static + Scan> Scan for Gc<T> {
     fn scan(&self, ctx: &mut Context) {
         Collector::scan_ptr(ctx, self.ptr);
     }
 
     unsafe fn root(&self) {
-        todo!()
+        todo!("Re-root the Gc when it leaves a `GcCell`")
     }
 
     unsafe fn unroot(&self) {
-        todo!()
+        Collector::unroot_ptr(self.ptr);
     }
 }
 
@@ -82,7 +98,7 @@ impl<T: 'static + Scan> Scan for Gc<T> {
 /// a 32-bit fields to reduce the overall size overhead of the struct.
 #[derive(Debug)]
 #[doc(hidden)]
-pub struct GcBox<T: Scan + ?Sized> {
+pub(crate) struct GcBox<T: Scan + ?Sized> {
     pub(crate) root: Cell<u32>,
     pub(crate) color: Cell<GcColor>,
     pub(crate) next: Cell<Option<NonNull<GcBox<dyn Scan>>>>,
@@ -90,16 +106,26 @@ pub struct GcBox<T: Scan + ?Sized> {
 }
 
 impl<T: Scan + ?Sized> GcBox<T> {
-    fn dec(&self) {
-        self.root.set(self.root.get() - 1);
+    pub(crate) fn dec(&self) {
+        // Unlike an `Rc` we can decrement the reference count even though
+        // it's already 0. Decrement can happen when an owning `Gc<T>` is
+        // dropped, and when it is moved into another `Gc<T>` via `Collector::alloc_gc`.
+        if self.root.get() > 0 {
+            self.root.set(self.root.get() - 1);
+        }
     }
 
-    fn incr(&self) {
+    pub(crate) fn incr(&self) {
         self.root.set(self.root.get() + 1);
     }
 
     pub(crate) fn value(&self) -> &T {
         &self.value
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_root(&self) -> bool {
+        self.root.get() > 0
     }
 
     fn color(&self) -> GcColor {
