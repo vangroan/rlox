@@ -1,8 +1,11 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rlox_gc::{Collector};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use rlox_gc::Collector;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("alloc 8Byte", |b| {
+    let mut group = c.benchmark_group("alloc");
+
+    group.throughput(Throughput::Bytes(8));
+    group.bench_function(BenchmarkId::from_parameter(8), |b| {
         let mut collector = Collector::new();
 
         b.iter(|| collector.alloc(black_box([0u8; 8])));
@@ -10,7 +13,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         collector.collect()
     });
 
-    c.bench_function("alloc 24Byte", |b| {
+    group.throughput(Throughput::Bytes(24));
+    group.bench_function(BenchmarkId::from_parameter(24), |b| {
         let mut collector = Collector::new();
 
         b.iter(|| collector.alloc(black_box([0u8; 24])));
@@ -18,13 +22,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         collector.collect()
     });
 
-    c.bench_function("alloc 32Byte", |b| {
+    group.throughput(Throughput::Bytes(32));
+    group.bench_function(BenchmarkId::from_parameter(32), |b| {
         let mut collector = Collector::new();
 
         b.iter(|| collector.alloc(black_box([0u8; 32])));
 
         collector.collect()
     });
+
+    group.finish();
 }
 
 criterion_group!(benches, criterion_benchmark);
