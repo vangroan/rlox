@@ -67,7 +67,7 @@ impl Collector {
         };
         let ptr = unsafe { NonNull::new_unchecked(Box::leak(Box::new(sized))) };
         self.head = Some(ptr);
-        println!("Alloc {:?}", ptr);
+        // println!("Alloc {:?}", ptr);
 
         // Allocation can occur while the sweep phase is in progress.
         //
@@ -107,7 +107,7 @@ impl Collector {
 
     /// Run a garbage collection cycle.
     pub fn collect(&mut self) {
-        println!("Collect");
+        // println!("Collect");
         // TODO: Wake on allocate
         self.state = CollectState::Wake;
         self.wake = self.head;
@@ -123,7 +123,7 @@ impl Collector {
                         // A `GcBox` is considered part of the root set if
                         // its reference count is not zero.
                         if gc_box.is_root() {
-                            println!("Root discovered {:?}", ptr);
+                            // println!("Root discovered {:?}", ptr);
                             gc_box.color.set(GcColor::Gray);
                             self.gray.push(ptr);
                         }
@@ -133,21 +133,21 @@ impl Collector {
                     }
                 }
                 CollectState::Mark => {
-                    println!("gray {:?}", self.gray);
+                    // println!("gray {:?}", self.gray);
 
                     let mut ctx = Context {
                         gray: &mut self.gray_new,
                     };
                     if let Some(ptr) = self.gray.pop() {
                         let gc_box = unsafe { ptr.as_ref() };
-                        println!("Mark {:?}", ptr);
+                        // println!("Mark {:?}", ptr);
                         gc_box.value.scan(&mut ctx);
                         gc_box.color.set(GcColor::Black);
 
                         // Reachable items have been set from white to gray.
                         self.gray.extend(ctx.gray.drain(..));
                     } else {
-                        println!("Preparing for sweep");
+                        // println!("Preparing for sweep");
                         self.state = CollectState::Sweep;
                         // Prepare for sweep phase.
                         self.sweep = self.head;
@@ -167,11 +167,11 @@ impl Collector {
                         let color = unsafe { sweep_ptr.as_ref().color.get() };
                         match color {
                             GcColor::White => {
-                                println!("Deallocate {:?}", sweep_ptr);
+                                // println!("Deallocate {:?}", sweep_ptr);
 
                                 match self.sweep_prev {
                                     Some(sweep_prev) => {
-                                        println!("De-link {:?}", sweep_ptr);
+                                        // println!("De-link {:?}", sweep_ptr);
                                         // If the previously swept pointer is `Some` then
                                         // we are in the middle of the linked list, and the current
                                         // node needs to be delinked.
@@ -179,14 +179,14 @@ impl Collector {
                                         gc_box_prev.next.set(next_ptr);
                                     }
                                     None => {
-                                        println!("De-link Head {:?}", sweep_ptr);
+                                        // println!("De-link Head {:?}", sweep_ptr);
                                         // If the previously swept pointer is `None` then
                                         // we are looking at the head of the linked list.
                                         // The head pointer needs to be advanced to the next
                                         // node in the list.
                                         assert_eq!(self.head, Some(sweep_ptr));
                                         self.head = next_ptr;
-                                        println!("New Head {:?}", self.head);
+                                        // println!("New Head {:?}", self.head);
                                     }
                                 }
                                 // Cast the pointer to a box and let it drop.
@@ -198,7 +198,7 @@ impl Collector {
                                 }
                             }
                             GcColor::Black => {
-                                println!("Survive {:?}", sweep_ptr);
+                                // println!("Survive {:?}", sweep_ptr);
                                 self.sweep_prev = Some(sweep_ptr);
 
                                 // Reachable from root set.
@@ -229,7 +229,7 @@ impl Collector {
                 // and should not be collected.
                 gc_box.color.set(GcColor::Gray);
                 ctx.gray.push(ptr);
-                println!("Push {:?}", ptr);
+                // println!("Push {:?}", ptr);
                 // We don't recurse further with the scan. A pointer forms a boundary for work.
             }
             GcColor::Gray | GcColor::Black => {}
@@ -251,7 +251,7 @@ impl Collector {
 impl Drop for Collector {
     fn drop(&mut self) {
         if self.can_drop() {
-            println!("Collector Drop");
+            // println!("Collector Drop");
             // Deallocate owned pointers.
             self.collect();
             assert_eq!(self.len(), 0, "Collector dropped but some items are still reachable");

@@ -6,9 +6,23 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bench]]
+name = "bench_alloc"
+harness = false
+
+[[bench]]
+name = "bench_collect"
+harness = false
+
+[dev-dependencies]
+criterion = "0.3"
+
 [dependencies]
 typed-arena = "2.0.1"
 rlox-gc-derive = { version = "*", path = "../rlox-gc-derive" }
 
 [features]
 derive = []
+
+# Print to stdout when through GC algorithm.
+trace-gc = []

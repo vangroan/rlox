@@ -11,13 +11,13 @@ name = "stack_peek"
 harness = false
 
 [dependencies]
-criterion = "0.3"
 flame = { version = "0.2", optional = true }
 num-traits = "0.2"
 num-derive = "0.3"
 rlox-derive = { version = "*", path = "../rlox-derive" }
 
 [dev-dependencies]
+criterion = "0.3"
 flame = "0.2"
 
 [features]
