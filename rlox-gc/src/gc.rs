@@ -88,9 +88,6 @@ unsafe impl<T: 'static + Scan> Scan for Gc<T> {
 }
 
 /// Internal pointer type to garbage collected space.
-///
-/// The `flag` field is information pertinent to the garbage collection algorithm, packed into
-/// a 32-bit fields to reduce the overall size overhead of the struct.
 #[derive(Debug)]
 #[doc(hidden)]
 pub(crate) struct GcBox<T: Scan + ?Sized> {
