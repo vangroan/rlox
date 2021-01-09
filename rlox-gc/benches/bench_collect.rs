@@ -15,9 +15,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     }
                     collector
                 },
-                |c| {
-                    c.collect()
-                },
+                |c| c.collect(),
                 BatchSize::SmallInput,
             )
         });

@@ -199,6 +199,11 @@ impl Collector {
                                 // SAFETY: If all the invariants of the collector hold true, we can safely
                                 //         drop this `GcBox`. Any pointer remaining in a Gc<T>, Vec<_> or
                                 //         linked list, is a bug in the collector.
+                                debug_assert_eq!(
+                                    unsafe { sweep_ptr.as_ref().root.get() },
+                                    0,
+                                    "GcBox deallocated but still rooted."
+                                );
                                 unsafe {
                                     Box::from_raw(sweep_ptr.as_ptr());
                                 }
