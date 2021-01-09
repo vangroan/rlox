@@ -1,3 +1,4 @@
+#![allow(clippy::blacklisted_name)]
 use rlox_gc::{context::Context, scan::Scan, Collector, Gc};
 use rlox_gc_derive::Scan;
 use std::cell::Cell;

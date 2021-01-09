@@ -94,6 +94,7 @@ impl Collector {
     /// Returns the number of objects that have been allocated.
     ///
     /// This is an expensive call that needs to iterate over the entire contents of the inner storage.
+    #[inline]
     pub fn len(&self) -> usize {
         let mut head = self.head;
         let mut count = 0;
@@ -103,6 +104,11 @@ impl Collector {
             head = gc_box.next.get();
         }
         count
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Run a garbage collection cycle.
@@ -256,6 +262,12 @@ impl Drop for Collector {
             self.collect();
             assert_eq!(self.len(), 0, "Collector dropped but some items are still reachable");
         }
+    }
+}
+
+impl Default for Collector {
+    fn default() -> Self {
+        Collector::new()
     }
 }
 
