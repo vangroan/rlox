@@ -12,6 +12,22 @@ pub enum Value {
     Err,
 }
 
+impl Value {
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Value::Float(v) => Some(*v),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Value {
+    #[inline]
+    fn default() -> Self {
+        Value::Null
+    }
+}
+
 impl Into<Value> for f64 {
     fn into(self) -> Value {
         Value::Float(self)

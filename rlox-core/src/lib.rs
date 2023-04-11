@@ -5,12 +5,13 @@ mod opcode;
 mod value;
 mod vm;
 
-pub use chunk::Chunk;
-pub use error::{LoxError, Result};
-pub use opcode::OpCode;
-pub use vm::LoxVm;
+pub use self::chunk::{Chunk, ConstantIndex};
+pub use self::error::{LoxError, Result};
+pub use self::opcode::OpCode;
+pub use self::value::Value;
+pub use self::vm::LoxVm;
 
 pub mod prelude {
-    pub use crate::chunk::PushCode;
-    pub use crate::vm::LoxVm;
+    pub use super::chunk::PushCode;
+    pub use super::vm::LoxVm;
 }

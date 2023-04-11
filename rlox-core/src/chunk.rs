@@ -11,13 +11,13 @@ pub struct Chunk {
 
 impl Chunk {
     /// Threshold where the number of constants changes from using 8-bit indices to 24-bit indices.
-    const CONSTANT_THRESHOLD: usize = 256;
+    const CONSTANT_THRESHOLD: usize = u8::MAX as usize;
     /// Exclusive maximum number of allowed constants. Limited by max value of 24-bit unsigned integer.
     const CONSTANT_MAX: usize = 16_777_216; // 2^24
 
     pub fn new() -> Self {
         Chunk {
-            constants: Vec::with_capacity(Self::CONSTANT_THRESHOLD),
+            constants: Vec::with_capacity(Self::CONSTANT_THRESHOLD - 1),
             code: vec![],
             line: vec![],
         }
@@ -46,17 +46,13 @@ impl Chunk {
     /// # Panic
     ///
     /// Panics if the maximum number of constants has been reached.
-    pub fn add_constant<T>(&mut self, constant: T) -> ConstantIndex
-    where
-        T: Into<Value>,
-    {
+    pub fn add_constant(&mut self, constant: impl Into<Value>) -> ConstantIndex {
         assert!(
             self.constants.len() + 1 < Chunk::CONSTANT_MAX,
             "Chunk constant vector overflow"
         );
 
-        // Comparison is exclusive, as 256 rolls over to the 9th bit.
-        let index = if self.constants.len() < Chunk::CONSTANT_THRESHOLD {
+        let index = if self.constants.len() <= Chunk::CONSTANT_THRESHOLD {
             ConstantIndex::U8(self.constants.len() as u8)
         } else {
             ConstantIndex::U24(self.constants.len() as u32)
@@ -65,9 +61,32 @@ impl Chunk {
         index
     }
 
+    /// Explicitly adds a constant value with a 24-bit index.
+    ///
+    /// Returns a unique index that can be used to reference the constant.
+    ///
+    /// # Panic
+    ///
+    /// Panics if the maximum number of constants has been reached.
+    pub fn add_constant_long(&mut self, constant: impl Into<Value>) -> ConstantIndex {
+        assert!(
+            self.constants.len() + 1 < Chunk::CONSTANT_MAX,
+            "Chunk constant vector overflow"
+        );
+
+        let index = ConstantIndex::U24(self.constants.len() as u32);
+        self.constants.push(constant.into());
+        index
+    }
+
     #[inline]
     pub fn get_constant_unchecked(&self, index: ConstantIndex) -> &Value {
         unsafe { self.constants.get_unchecked(index.to_usize()) }
+    }
+
+    #[inline(always)]
+    pub fn get_contant(&self, index: ConstantIndex) -> Option<&Value> {
+        self.constants.get(index.to_usize())
     }
 
     /// Write a single opcode to the chunk's code.
@@ -269,6 +288,12 @@ impl PushCode for OpCode {
     }
 }
 
+impl PushCode for u8 {
+    fn push_instruction(&self, chunk: &mut Chunk, line: usize) {
+        chunk.push_u8(*self, line)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -280,7 +305,7 @@ mod test {
         for i in 0..1024 {
             let index = chunk.add_constant(i as f64);
 
-            if i < Chunk::CONSTANT_THRESHOLD {
+            if i <= Chunk::CONSTANT_THRESHOLD {
                 chunk.push(OpCode::Constant, 123);
                 chunk.push(index, 123);
 

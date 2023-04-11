@@ -79,14 +79,27 @@ impl LoxVm {
         value
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> error::Result<()> {
+    #[inline]
+    fn try_pop(&mut self) -> Value {
+        #[cfg(feature = "profile")]
+        let _ = flame::start_guard("vm try_pop");
+
+        if self.top >= 1 {
+            self.top -= 1;
+        }
+        let mut value = Value::Null;
+        std::mem::swap(&mut value, &mut self.stack[self.top]);
+        value
+    }
+
+    pub fn interpret(&mut self, chunk: Chunk) -> error::Result<Value> {
         self.chunk = chunk;
         self.ip = 0;
 
         if self.chunk.len() > 0 {
             self.run()
         } else {
-            Ok(())
+            Ok(Value::Null)
         }
     }
 
@@ -97,7 +110,20 @@ impl LoxVm {
         b
     }
 
-    fn run(&mut self) -> error::Result<()> {
+    fn get_3bytes(&mut self) -> [u8; 3] {
+        let x = self.chunk.get_byte(self.ip);
+        let y = self.chunk.get_byte(self.ip + 1);
+        let z = self.chunk.get_byte(self.ip + 2);
+        self.ip += 3;
+        [x, y, z]
+    }
+
+    /// Checks whether the instruction pointer is at the end of the chunk.
+    fn at_end(&self) -> bool {
+        self.ip >= self.chunk.len()
+    }
+
+    fn run(&mut self) -> error::Result<Value> {
         #[cfg(feature = "profile")]
         let _ = flame::start_guard("vm run");
 
@@ -116,6 +142,10 @@ impl LoxVm {
                 buf.clear();
             }
 
+            if self.at_end() {
+                return Ok(self.try_pop());
+            }
+
             let op = OpCode::from_u8(self.get_byte());
 
             #[cfg(feature = "profile")]
@@ -127,7 +157,16 @@ impl LoxVm {
                     let _ = flame::start_guard("opcode Constant");
 
                     let index = ConstantIndex::from_u8(self.get_byte());
-                    let constant = self.chunk.get_constant_unchecked(index).clone();
+                    let constant = self.chunk.get_contant(index).cloned().unwrap_or(Value::Null);
+                    self.push(constant);
+                }
+                Some(OpCode::ConstantLong) => {
+                    #[cfg(feature = "profile")]
+                    let _ = flame::start_guard("opcode ConstantLong");
+
+                    let [x, y, z] = self.get_3bytes();
+                    let index = ConstantIndex::from_u24_parts(x, y, z);
+                    let constant = self.chunk.get_contant(index).cloned().unwrap_or(Value::Null);
                     self.push(constant);
                 }
                 Some(OpCode::Negate) => {
@@ -174,8 +213,7 @@ impl LoxVm {
                     let _ = flame::start_guard("opcode Return");
 
                     // println!("Interpret return {}", self.pop());
-                    self.pop();
-                    return Ok(());
+                    return Ok(self.try_pop());
                 }
                 _ => {}
             }

@@ -2,6 +2,7 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToPrimitive, FromPrimitive)]
+#[repr(u8)]
 pub enum OpCode {
     /// Only used by the VM to advance the instruction pointer.
     ///
