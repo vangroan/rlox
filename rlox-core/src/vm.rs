@@ -165,7 +165,7 @@ impl LoxVm {
                     let _ = flame::start_guard("opcode ConstantLong");
 
                     let [x, y, z] = self.get_3bytes();
-                    let index = ConstantIndex::from_u24_parts(x, y, z);
+                    let index = ConstantIndex::from_parts(x, y, z);
                     let constant = self.chunk.get_contant(index).cloned().unwrap_or(Value::Null);
                     self.push(constant);
                 }

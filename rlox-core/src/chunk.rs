@@ -12,8 +12,9 @@ pub struct Chunk {
 impl Chunk {
     /// Threshold where the number of constants changes from using 8-bit indices to 24-bit indices.
     const CONSTANT_THRESHOLD: usize = u8::MAX as usize;
+    const CONSTANT_MASK: usize = 0xFFFFFF; // 2^24
     /// Exclusive maximum number of allowed constants. Limited by max value of 24-bit unsigned integer.
-    const CONSTANT_MAX: usize = 16_777_216; // 2^24
+    const CONSTANT_MAX: usize = Self::CONSTANT_MASK + 1;
 
     pub fn new() -> Self {
         Chunk {
@@ -53,9 +54,9 @@ impl Chunk {
         );
 
         let index = if self.constants.len() <= Chunk::CONSTANT_THRESHOLD {
-            ConstantIndex::U8(self.constants.len() as u8)
+            ConstantIndex::Short(self.constants.len() as u8)
         } else {
-            ConstantIndex::U24(self.constants.len() as u32)
+            ConstantIndex::Long(self.constants.len() as u32)
         };
         self.constants.push(constant.into());
         index
@@ -74,7 +75,7 @@ impl Chunk {
             "Chunk constant vector overflow"
         );
 
-        let index = ConstantIndex::U24(self.constants.len() as u32);
+        let index = ConstantIndex::Long(self.constants.len() as u32);
         self.constants.push(constant.into());
         index
     }
@@ -90,23 +91,23 @@ impl Chunk {
     }
 
     /// Write a single opcode to the chunk's code.
-    pub fn push_op(&mut self, opcode: OpCode, line: usize) {
+    pub fn write_op(&mut self, opcode: OpCode, line: usize) {
         self.code.push(opcode.to_u8().unwrap());
         self.line.push(line);
     }
 
     /// Write a single byte to the chunk's code.
-    pub fn push_u8(&mut self, instruction: u8, line: usize) {
+    pub fn write_u8(&mut self, instruction: u8, line: usize) {
         self.code.push(instruction);
         self.line.push(line);
     }
 
     /// Write a single value to the chunk's code.
-    pub fn push<T>(&mut self, value: T, line: usize)
+    pub fn write<T>(&mut self, value: T, line: usize)
     where
-        T: PushCode,
+        T: EmitCode,
     {
-        value.push_instruction(self, line);
+        value.emit_bytecode(self, line);
     }
 
     /// Write a human readable representation of the bytecode stored in the chunk.
@@ -187,9 +188,9 @@ impl Chunk {
         W: FmtWrite,
     {
         let index = match op {
-            OpCode::Constant => ConstantIndex::U8(self.code[offset + 1]),
+            OpCode::Constant => ConstantIndex::Short(self.code[offset + 1]),
             OpCode::ConstantLong => {
-                ConstantIndex::from_u24_parts(self.code[offset + 1], self.code[offset + 2], self.code[offset + 3])
+                ConstantIndex::from_parts(self.code[offset + 1], self.code[offset + 2], self.code[offset + 3])
             }
             _ => {
                 unreachable!("Disassemble constant called with incorrect opcode {:?}", op);
@@ -198,8 +199,8 @@ impl Chunk {
         writeln!(w, "{:?}\t\t{:4} '{}'", op, index, self.constants[index.to_usize()])?;
 
         match index {
-            ConstantIndex::U8(_) => Ok(offset + 2),
-            ConstantIndex::U24(_) => Ok(offset + 4),
+            ConstantIndex::Short(_) => Ok(offset + 2),
+            ConstantIndex::Long(_) => Ok(offset + 4),
         }
     }
 }
@@ -208,31 +209,44 @@ impl Chunk {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ConstantIndex {
     /// Index to the first 256 constants.
-    U8(u8),
+    Short(u8),
     /// Index to the rest of the constants. Only the 24 lower (rightmost) bits are used, because
     /// the whole 32-bit instruction also contains an 8-bit opcode.
-    U24(u32),
+    Long(u32),
 }
 
 impl ConstantIndex {
     #[inline(always)]
     pub fn from_u8(value: u8) -> Self {
-        ConstantIndex::U8(value)
+        ConstantIndex::Short(value)
     }
 
-    /// Assemble an index from instruction bytes.
+    /// Create a constant index from a 32-bit integer.
+    pub fn from_u32(value: u32) -> Self {
+        assert!(value < Chunk::CONSTANT_MAX as u32, "constant index must fit in 24 bits");
+
+        if value <= Chunk::CONSTANT_THRESHOLD as u32 {
+            ConstantIndex::Short(value as u8)
+        } else {
+            ConstantIndex::Long(value)
+        }
+    }
+
+    /// Assemble a 24-bit index from instruction bytes.
     ///
     /// The parts must be in big-endian order, with the most significant byte first and least significant last.
+    ///
+    /// The upper 8-bits will be unused.
     #[inline]
-    pub fn from_u24_parts(x: u8, y: u8, z: u8) -> Self {
-        ConstantIndex::U24((x as u32) << 16 | (y as u32) << 8 | z as u32)
+    pub fn from_parts(x: u8, y: u8, z: u8) -> Self {
+        ConstantIndex::Long((x as u32) << 16 | (y as u32) << 8 | z as u32)
     }
 
     #[inline]
     pub fn val(&self) -> u32 {
         match self {
-            ConstantIndex::U8(value) => *value as u32,
-            ConstantIndex::U24(value) => *value,
+            ConstantIndex::Short(value) => *value as u32,
+            ConstantIndex::Long(value) => *value,
         }
     }
 
@@ -243,54 +257,54 @@ impl ConstantIndex {
 
     #[inline]
     pub fn is_u8(&self) -> bool {
-        matches!(self, ConstantIndex::U8(_))
+        matches!(self, ConstantIndex::Short(_))
     }
 
     #[inline]
     pub fn is_u24(&self) -> bool {
-        matches!(self, ConstantIndex::U24(_))
+        matches!(self, ConstantIndex::Long(_))
     }
 }
 
 impl std::fmt::Display for ConstantIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ConstantIndex::U8(value) => value.fmt(f),
-            ConstantIndex::U24(value) => value.fmt(f),
+            ConstantIndex::Short(value) => value.fmt(f),
+            ConstantIndex::Long(value) => value.fmt(f),
         }
     }
 }
 
-impl PushCode for ConstantIndex {
-    fn push_instruction(&self, chunk: &mut Chunk, line: usize) {
+impl EmitCode for ConstantIndex {
+    fn emit_bytecode(&self, chunk: &mut Chunk, line: usize) {
         match self {
-            ConstantIndex::U8(value) => {
-                chunk.push_u8(*value, line);
+            ConstantIndex::Short(value) => {
+                chunk.write_u8(*value, line);
             }
-            ConstantIndex::U24(value) => {
+            ConstantIndex::Long(value) => {
                 // Big-endian
-                chunk.push_u8(((*value >> 16) & 0xFF) as u8, line);
-                chunk.push_u8(((*value >> 8) & 0xFF) as u8, line);
-                chunk.push_u8((*value & 0xFF) as u8, line);
+                chunk.write_u8(((*value >> 16) & 0xFF) as u8, line);
+                chunk.write_u8(((*value >> 8) & 0xFF) as u8, line);
+                chunk.write_u8((*value & 0xFF) as u8, line);
             }
         }
     }
 }
 
 /// Trait to allow value to be written into a code chunk.
-pub trait PushCode {
-    fn push_instruction(&self, chunk: &mut Chunk, line: usize);
+pub trait EmitCode {
+    fn emit_bytecode(&self, chunk: &mut Chunk, line: usize);
 }
 
-impl PushCode for OpCode {
-    fn push_instruction(&self, chunk: &mut Chunk, line: usize) {
-        chunk.push_op(*self, line);
+impl EmitCode for OpCode {
+    fn emit_bytecode(&self, chunk: &mut Chunk, line: usize) {
+        chunk.write_op(*self, line);
     }
 }
 
-impl PushCode for u8 {
-    fn push_instruction(&self, chunk: &mut Chunk, line: usize) {
-        chunk.push_u8(*self, line)
+impl EmitCode for u8 {
+    fn emit_bytecode(&self, chunk: &mut Chunk, line: usize) {
+        chunk.write_u8(*self, line)
     }
 }
 
@@ -306,14 +320,14 @@ mod test {
             let index = chunk.add_constant(i as f64);
 
             if i <= Chunk::CONSTANT_THRESHOLD {
-                chunk.push(OpCode::Constant, 123);
-                chunk.push(index, 123);
+                chunk.write(OpCode::Constant, 123);
+                chunk.write(index, 123);
 
                 assert!(index.is_u8());
                 assert_eq!(index, ConstantIndex::from_u8(i as u8));
             } else {
-                chunk.push(OpCode::ConstantLong, 123);
-                chunk.push(index, 123);
+                chunk.write(OpCode::ConstantLong, 123);
+                chunk.write(index, 123);
 
                 assert!(index.is_u24());
             }

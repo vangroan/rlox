@@ -12,6 +12,6 @@ pub use self::value::Value;
 pub use self::vm::LoxVm;
 
 pub mod prelude {
-    pub use super::chunk::PushCode;
+    pub use super::chunk::EmitCode;
     pub use super::vm::LoxVm;
 }
