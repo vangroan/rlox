@@ -205,7 +205,7 @@ impl Collector {
                                     "GcBox deallocated but still rooted."
                                 );
                                 unsafe {
-                                    Box::from_raw(sweep_ptr.as_ptr());
+                                    drop(Box::from_raw(sweep_ptr.as_ptr()));
                                 }
                             }
                             GcColor::Black => {
